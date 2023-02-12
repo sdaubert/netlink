@@ -8,6 +8,8 @@ module Netlink
   class Error < StandardError; end
   # Error when using {Socket}
   class SocketError < Error; end
+  # Error on Netlink messages (a {NlmsgError} was received)
+  class NlmError < Error; end
 
   # Routing/device hook
   NETLINK_ROUTE	=	0
@@ -60,5 +62,5 @@ module Netlink
 end
 
 require_relative 'netlink/addrinfo'
-require_relative 'netlink/nlmsghdr'
+require_relative 'netlink/nlmsg'
 require_relative 'netlink/socket'

@@ -81,50 +81,54 @@ module Netlink
     end
 
     # Send +mesg+ via socket
-    # @param [String] mesg message to send
+    # @param [String, NlMsg] mesg message to send
     # @param [Integer] nlm_type Message Type
     # @param [Integer] nlm_flags Netlink message flags. Should be a bitwise OR of {Netlink}::NLM_F_* constants
     # @param [Integer] flags +flags+ Socket flags. Should be a bitwise OR of {::Socket}::MSG_* constants
     # @param [String,Addrinfo,nil] dest_sockaddr
     # @return [Integer] number of bytes sent
     def sendmsg(mesg, nlm_type, nlm_flags=0, flags=0, dest_sockaddr=nil)
-      nlmsg = create_nlmsg(mesg, nlm_type, nlm_flags)
-      @socket.sendmsg(nlmsg, flags, dest_sockaddr.to_s)
+      nlmsg = mesg.is_a?(Nlmsg) ? mesg : create_nlmsg(mesg, nlm_type, nlm_flags)
+      @socket.sendmsg(nlmsg.encode, flags, dest_sockaddr.to_s)
     end
 
     # Receive a message
     # @param [Integer] maxmesglen maximum number of bytes to receive as message
     # @param [Integer] flags +flags+ should be a bitwise OR of {::Socket}::MSG_* constants
-    # @return [Array(String, Addrinfo, Integer, NlMsgHdr)] +[mesg, sender_addrinfo, rflags, controls]+ where:
-    #   * +mesg+ is the message as a String or a {NlMsgError},
-    #   * +sender_addrinfo+ is a {Addrinfo} about sender,
-    #   + +controls+ is the ancillary data, here the header of message as a {NlMsgHdr}.
+    # @return [Array(Nlmsg, Addrinfo)]
     # @raise [NlmsgError]
     def recvmsg(maxmesglen=nil, flags=0)
       maxmesglen ||= @default_buffer_size
-      maxlen = maxmesglen + NlMsgHdr::SIZE
-      mesg, sender_ai, = @socket.recvmsg(maxlen, flags)
-      hdr = NlMsgHdr.from_string(mesg.slice!(0, NlMsgHdr::SIZE))
-      if hdr.type == NLMSG_ERROR
-        mesg = NlMsgError.from_string(mesg)
-        raise Error, "Error #{mesg.error_code} for message with seq #{mesg.orig_header.seq} from pid #{mesg.orig_header.pid}" unless mesg.ack?
-      end
+      mesg, sender_ai, = @socket.recvmsg(maxmesglen, flags)
+      sender_ai = Addrinfo.new(sender_ai.to_s)
+      nlmsg = Nlmsg.decode(mesg)
+      [nlmsg, sender_ai]
+    end
 
-      mesg = mesg[0, maxmesglen] if mesg.is_a?(String)
-      [mesg, Addrinfo.new(sender_ai.to_sockaddr), hdr]
+    # Return underlying IO object.
+    # @return [IO]
+    def to_io
+      @socket
     end
 
     private
 
     # Create a NlMsg from +mesg+ by adding header and padding
-    # @param [String] mesg
-    # @param [Integer] type message type
+    # @param [Nlmsg,String] mesg
+    # @param [Integer,nil] type message type. Mandatory if +mesg+ is a String.
     # @param [Integer] flags +flags+ should be a bitwise OR of {Netlink}::NETLINK_F_* constants
-    # @return [String]
-    def create_nlmsg(mesg, type, flags)
-      hdr = NlMsgHdr.new(0, type, flags, seqnum, @pid)
-      hdr.compute_length(mesg)
-      hdr.to_s << mesg
+    # @return [Nlmsg]
+    def create_nlmsg(mesg, type=nil, flags= 0)
+      case mesg
+      when String
+        Nlmsg.new(mesg, Nlmsg::Header.new(type: type, flags: flags, seq: seqnum, pid: @pid))
+      when Nlmsg
+        mesg.header.seq = seqnum
+        mesg.header.pid = @pid
+        mesg
+      else
+        raise TypeError, "mesg should be a #{Nlmsg.to_s} or a String"
+      end
     end
 
     # Return sequence number to use

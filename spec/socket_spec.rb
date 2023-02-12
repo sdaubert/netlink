@@ -68,8 +68,8 @@ module Netlink
         Socket.new(NETLINK_GENERIC) do |sock_snd|
           sock_snd.bind(0)
           sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
-          recv_data, = sock_recv.recvmsg
-          expect(recv_data).to eq(data)
+          msg, = sock_recv.recvmsg
+          expect(msg.data).to eq(data)
         end
       end
     end
@@ -81,8 +81,9 @@ module Netlink
         Socket.new(NETLINK_GENERIC) do |sock_snd|
           sock_snd.bind(0)
           sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
-          recv_data, = sock_recv.recvmsg
-          expect(recv_data).to eq(data)
+          msg, = sock_recv.recvmsg
+          expect(msg).to be_a(Nlmsg)
+          expect(msg.data).to eq(data)
         end
       end
     end
@@ -96,7 +97,9 @@ module Netlink
             sock_snd.bind(0)
             sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
             ary = sock_recv.recvmsg
-            expect(ary[0]).to eq(data)
+            expect(ary).to be_a(Array)
+            expect(ary.size).to eq(2)
+            expect(ary[0].data).to eq(data)
             expect(ary[1]).to be_a(Addrinfo)
             expect(ary[1]).to eq(Addrinfo.new(sock_snd.addr))
           end
@@ -110,21 +113,22 @@ module Netlink
           Socket.new(NETLINK_GENERIC) do |sock_snd|
             sock_snd.bind(0)
             sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
-            ary = sock_recv.recvmsg
-            expect(ary[0]).to eq(data)
-            expect(ary[2]).to be_a(NlMsgHdr)
-            expect(ary[2].type).to eq(1)
-            expect(ary[2].pid).to eq(sock_snd.addr[1])
+            msg, = sock_recv.recvmsg
+            expect(msg).to be_a(Nlmsg)
+            expect(msg.header).to be_a(Nlmsg::Header)
+            expect(msg.header.type).to eq(1)
+            expect(msg.header.pid).to eq(sock_snd.addr[1])
           end
         end
       end
 
-      it 'decodes mesg as a NlMsgError if it is' do
+      it 'decodes a received ACK' do
         Socket.new(NETLINK_GENERIC) do |sock|
           sock.bind(0)
           sock.sendmsg('test', 1, NLM_F_ACK, 0, Addrinfo.new(['AF_NETLINK', 0, 0]))
-          ary = sock.recvmsg
-          expect(ary[0]).to be_a(NlMsgError)
+          ack, = sock.recvmsg
+          expect(ack).to be_a(NlmsgError)
+          expect(ack.error_code).to eq(0)
         end
       end
     end
