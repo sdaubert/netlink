@@ -1,16 +1,6 @@
 # frozen_string_literal: true
 
 module Netlink
-  # Mixin to make some classes pad-enabled
-  module NlmsgPad
-    # Add padding to given +data+
-    # @param [String] data
-    # @return [String]
-    def pad(data)
-      data.b << "\x00" * -(data.size % -@align)
-    end
-  end
-
   # Netlink message class
   #
   # A netlink message is composed of a {Header header} and associated data:
@@ -18,6 +8,16 @@ module Netlink
   #   |  header  | Pad |     Payload    | Pad |
   #   +----------+- - -+- - - - - - - - +- - -+
   class Nlmsg
+    # Mixin to make some classes pad-enabled
+    module PadMixin
+      # Add padding to given +data+
+      # @param [String] data
+      # @return [String]
+      def pad(data)
+        data.b << "\x00" * -(data.size % -@align)
+      end
+    end
+
     # Netlink message header class
     #
     # This header encodes:
@@ -27,14 +27,22 @@ module Netlink
     # * sequence number,
     # * sender port ID.
     class Header
-      include NlmsgPad
+      include PadMixin
 
-      # @!attribute [Integer] type
-      # @!attribute [Integer] flags
-      # @!attribute [Integer] seq
-      # @!attribute [Integer] pid
-      attr_accessor :type, :flags, :seq, :pid
-      # @!attribute [Integer] length
+      # Message type
+      # @return [Integer]
+      attr_accessor :type
+      # Message flags. Bitwise OR of {Netlink}::NLM_F_* constants
+      # @return [Integer]
+      attr_accessor :flags
+      # Message sequence number
+      # @return [Integer]
+      attr_accessor :seq
+      # Sender port ID
+      # @return [Integer]
+      attr_accessor :pid
+      # Total length of message (header and payloac)
+      # @return [Integer]
       attr_reader :length
 
       # Nlmsg header pack string
@@ -82,7 +90,7 @@ module Netlink
       end
     end
 
-    include NlmsgPad
+    include PadMixin
 
     # @!attribute [String] data
     # @!attribute [Header] header
@@ -148,28 +156,4 @@ module Netlink
       @data = data
     end
   end
-
-  class NlmsgError < Nlmsg
-    attr_reader :error_code, :orig_header
-
-    def initialize(error_code=0, orig_header=Nlmsg::Header.new)
-      @error_code = error_code
-      @orig_header = orig_header
-      super(error_code, orig_header)
-    end
-
-    def encode_data
-      [@error_code].pack('L') << @orig_header.to_s
-    end
-
-    def decode_data(data)
-      @data = @error_code = data.unpack1('L')
-      @orig_header = Nlmsg::Header.new.decode(data[4..])
-    end
-
-    def ack?
-      @error_code.zero?
-    end
-  end
-  Nlmsg.record_type(NLMSG_ERROR, NlmsgError)
 end

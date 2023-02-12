@@ -63,4 +63,5 @@ end
 
 require_relative 'netlink/addrinfo'
 require_relative 'netlink/nlmsg'
+require_relative 'netlink/nlmsg_error'
 require_relative 'netlink/socket'

@@ -27,7 +27,10 @@ module Netlink
       end
 
       alias old_new new
+      private :old_new
 
+      # @param [Integer] family Netlink family (a {Netlink}::NETLINK_* constant)
+      # @return [Socket]
       def new(family)
         sock = old_new(family)
         if block_given?
