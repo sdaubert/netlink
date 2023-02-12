@@ -87,9 +87,9 @@ module Netlink
     # @param [Integer] flags +flags+ Socket flags. Should be a bitwise OR of {::Socket}::MSG_* constants
     # @param [String,Addrinfo,nil] dest_sockaddr
     # @return [Integer] number of bytes sent
-    def sendmsg(mesg, nlm_type, nlm_flags=0, flags=0, dest_sockaddr=nil)
-      nlmsg = mesg.is_a?(Nlmsg) ? mesg : create_nlmsg(mesg, nlm_type, nlm_flags)
-      @socket.sendmsg(nlmsg.encode, flags, dest_sockaddr.to_s)
+    def sendmsg(mesg, nlm_type=0, nlm_flags=0, flags=0, dest_sockaddr=nil)
+      nlmsg = create_or_update_nlmsg(mesg, nlm_type, nlm_flags)
+      @socket.sendmsg(nlmsg.encode, flags, dest_sockaddr&.to_s)
     end
 
     # Receive a message
@@ -118,7 +118,7 @@ module Netlink
     # @param [Integer,nil] type message type. Mandatory if +mesg+ is a String.
     # @param [Integer] flags +flags+ should be a bitwise OR of {Netlink}::NETLINK_F_* constants
     # @return [Nlmsg]
-    def create_nlmsg(mesg, type=nil, flags= 0)
+    def create_or_update_nlmsg(mesg, type=nil, flags= 0)
       case mesg
       when String
         Nlmsg.new(mesg, Nlmsg::Header.new(type: type, flags: flags, seq: seqnum, pid: @pid))
@@ -127,7 +127,7 @@ module Netlink
         mesg.header.pid = @pid
         mesg
       else
-        raise TypeError, "mesg should be a #{Nlmsg.to_s} or a String"
+        raise TypeError, "mesg should be a #{Nlmsg} or a String"
       end
     end
 

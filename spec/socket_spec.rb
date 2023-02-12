@@ -61,34 +61,54 @@ module Netlink
       end
     end
 
-    it 'sends data over socket', :sudo do
-      data = 'Hello World!'
-      Socket.new(NETLINK_GENERIC) do |sock_recv|
-        sock_recv.bind(0)
-        Socket.new(NETLINK_GENERIC) do |sock_snd|
-          sock_snd.bind(0)
-          sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
-          msg, = sock_recv.recvmsg
-          expect(msg.data).to eq(data)
+    describe '#sendmsg' do
+      it 'sends data over socket', :sudo do
+        data = 'Hello World!'
+        Socket.new(NETLINK_GENERIC) do |sock_recv|
+          sock_recv.bind(0)
+          Socket.new(NETLINK_GENERIC) do |sock_snd|
+            sock_snd.bind(0)
+            sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
+            msg, = sock_recv.recvmsg
+            expect(msg.data).to eq(data)
+          end
         end
       end
-    end
 
-    it 'receives data from the socket', :sudo do
-      data = 'Hello World!'
-      Socket.new(NETLINK_GENERIC) do |sock_recv|
-        sock_recv.bind(0)
+      it 'accepts a Nlmsg as first parameter' do
         Socket.new(NETLINK_GENERIC) do |sock_snd|
+          msg = Nlmsg.new('test')
+          msg.header.type = NETLINK_GENERIC
           sock_snd.bind(0)
-          sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
-          msg, = sock_recv.recvmsg
-          expect(msg).to be_a(Nlmsg)
-          expect(msg.data).to eq(data)
+          expect { sock_snd.sendmsg('test') }.to_not raise_error
+        end
+      end
+
+      it 'raises if first argument is not a Nlmsg nor a Strinh' do
+        Socket.new(NETLINK_GENERIC) do |sock_snd|
+          msg = Nlmsg.new('test')
+          msg.header.type = NETLINK_GENERIC
+          sock_snd.bind(0)
+          expect { sock_snd.sendmsg(1_000_000) }.to raise_error(TypeError)
         end
       end
     end
 
     describe '#recvmsg' do
+      it 'receives data from the socket', :sudo do
+        data = 'Hello World!'
+        Socket.new(NETLINK_GENERIC) do |sock_recv|
+          sock_recv.bind(0)
+          Socket.new(NETLINK_GENERIC) do |sock_snd|
+            sock_snd.bind(0)
+            sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
+            msg, = sock_recv.recvmsg
+            expect(msg).to be_a(Nlmsg)
+            expect(msg.data).to eq(data)
+          end
+        end
+      end
+
       it 'returns address info', :sudo do
         data = 'Hello World!'
         Socket.new(NETLINK_GENERIC) do |sock_recv|
