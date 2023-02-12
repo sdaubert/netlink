@@ -10,11 +10,14 @@ RSpec::Core::RakeTask.new('spec:sudo') do |t|
   t.rspec_opts = '-t sudo'
 end
 
-require 'rubocop/rake_task'
+begin
+  require 'rubocop/rake_task'
 
-RuboCop::RakeTask.new
-
-task default: %i[spec rubocop]
+  RuboCop::RakeTask.new
+  task default: %i[spec rubocop]
+rescue LoadError
+  task default: :spec
+end
 
 # rubocop:disable Lint/SuppressedException
 begin
