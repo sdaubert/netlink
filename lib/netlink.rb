@@ -8,7 +8,7 @@ module Netlink
   class Error < StandardError; end
   # Error when using {Socket}
   class SocketError < Error; end
-  # Error on Netlink messages (a {NlmsgError} was received)
+  # Error on Netlink messages (a {Nl::MsgError} was received)
   class NlmError < Error; end
 
   # Routing/device hook
@@ -61,7 +61,6 @@ module Netlink
   NLMSG_DONE = 3
 end
 
+require_relative 'netlink/nl'
 require_relative 'netlink/addrinfo'
-require_relative 'netlink/nlmsg'
-require_relative 'netlink/nlmsg_error'
 require_relative 'netlink/socket'

@@ -104,7 +104,7 @@ module Netlink
       maxmesglen ||= @default_buffer_size
       mesg, sender_ai, = @socket.recvmsg(maxmesglen, flags)
       sender_ai = Addrinfo.new(sender_ai.to_s)
-      nlmsg = Nlmsg.decode(mesg)
+      nlmsg = Nl::Msg.decode(mesg)
       [nlmsg, sender_ai]
     end
 
@@ -124,13 +124,13 @@ module Netlink
     def create_or_update_nlmsg(mesg, type=nil, flags= 0)
       case mesg
       when String
-        Nlmsg.new(mesg, Nlmsg::Header.new(type: type, flags: flags, seq: seqnum, pid: @pid))
-      when Nlmsg
+        Nl::Msg.new(data: mesg, header: { type: type, flags: flags, seq: seqnum, pid: @pid })
+      when Nl::Msg
         mesg.header.seq = seqnum
         mesg.header.pid = @pid
         mesg
       else
-        raise TypeError, "mesg should be a #{Nlmsg} or a String"
+        raise TypeError, "mesg should be a #{Nl::Msg} or a String"
       end
     end
 

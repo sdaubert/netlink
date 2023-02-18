@@ -75,19 +75,16 @@ module Netlink
         end
       end
 
-      it 'accepts a Nlmsg as first parameter' do
+      it 'accepts a Nl::Msg as first parameter' do
         Socket.new(NETLINK_GENERIC) do |sock_snd|
-          msg = Nlmsg.new('test')
-          msg.header.type = NETLINK_GENERIC
+          msg = Nl::Msg.new(data: 'test', header: {type: NETLINK_GENERIC})
           sock_snd.bind(0)
           expect { sock_snd.sendmsg('test') }.to_not raise_error
         end
       end
 
-      it 'raises if first argument is not a Nlmsg nor a Strinh' do
+      it 'raises if first argument is not a Nlmsg nor a String' do
         Socket.new(NETLINK_GENERIC) do |sock_snd|
-          msg = Nlmsg.new('test')
-          msg.header.type = NETLINK_GENERIC
           sock_snd.bind(0)
           expect { sock_snd.sendmsg(1_000_000) }.to raise_error(TypeError)
         end
@@ -147,8 +144,8 @@ module Netlink
           sock.bind(0)
           sock.sendmsg('test', 1, NLM_F_ACK, 0, Addrinfo.new(['AF_NETLINK', 0, 0]))
           ack, = sock.recvmsg
-          expect(ack).to be_a(NlmsgError)
-          expect(ack.error_code).to eq(0)
+          expect(ack).to be_a(Nl::MsgError)
+          expect(ack.fields.error).to eq(0)
         end
       end
     end
