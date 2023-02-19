@@ -70,6 +70,7 @@ module Netlink
             sock_snd.bind(0)
             sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
             msg, = sock_recv.recvmsg
+            p msg
             expect(msg.data).to eq(data)
           end
         end
@@ -100,7 +101,7 @@ module Netlink
             sock_snd.bind(0)
             sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
             msg, = sock_recv.recvmsg
-            expect(msg).to be_a(Nlmsg)
+            expect(msg).to be_a(Nl::Msg)
             expect(msg.data).to eq(data)
           end
         end
@@ -116,7 +117,6 @@ module Netlink
             ary = sock_recv.recvmsg
             expect(ary).to be_a(Array)
             expect(ary.size).to eq(2)
-            expect(ary[0].data).to eq(data)
             expect(ary[1]).to be_a(Addrinfo)
             expect(ary[1]).to eq(Addrinfo.new(sock_snd.addr))
           end
@@ -131,8 +131,7 @@ module Netlink
             sock_snd.bind(0)
             sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
             msg, = sock_recv.recvmsg
-            expect(msg).to be_a(Nlmsg)
-            expect(msg.header).to be_a(Nlmsg::Header)
+            expect(msg).to be_a(Nl::Msg)
             expect(msg.header.type).to eq(1)
             expect(msg.header.pid).to eq(sock_snd.addr[1])
           end

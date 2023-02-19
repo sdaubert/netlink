@@ -81,25 +81,30 @@ module Netlink
       attr_reader :fields
       # @return [Struct]
       attr_reader :attributes
+      # Supplementary data
+      # @return [String]
+      attr_reader :data
 
       def initialize(header: {}, fields: {}, attributes: {})
         @header = create_struct(:header, header)
         @fields = create_struct(:fields, fields)
         @attributes = create_struct(:attributes, attributes)
+        @data = ''
       end
 
       # Encode message
-      # @param [String] data supplementary data to add to message
+      # @param [String,nil]] data supplementary data to add to message
       # @return [String] encoded netlink data as binary String
-      def encode(data='')
+      def encode(data=nil)
         str = encode_content(data)
         encode_header << str
       end
 
       # Encode message content. i.e. encode fields, attributes and supplementary data
-      # @param [String] data supplementary data to add to message
+      # @param [String,nil] data supplementary data to add to message
       # @return [String] encoded netlink data as binary String
-      def encode_content(data='')
+      def encode_content(data=nil)
+        data ||= @data
         encode_fields << encode_attributes << pad(data)
       end
 
@@ -110,7 +115,8 @@ module Netlink
         header_size = base_decode(self.class.header, header, data)
         fields_size = base_decode(self.class.fields, fields, data[header_size..])
         no_attr_size = header_size + fields_size
-        base_decode(self.class.attributes, attributes, data[no_attr_size..])
+        attr_size = base_decode(self.class.attributes, attributes, data[no_attr_size..])
+        @data = data[(no_attr_size + attr_size)..]
         self
       end
 

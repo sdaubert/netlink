@@ -35,9 +35,6 @@ module Netlink
                     flags: 'S',
                     seq: 'L',
                     pid: 'L'
-      # @!attribute [String] data
-      # @!attribute [Header] header
-      attr_accessor :data, :header
 
       # Decode a netlink message from +data+
       # @param [String] data
@@ -69,7 +66,7 @@ module Netlink
         @data = data
       end
 
-      def encode(data='')
+      def encode(data=nil)
         str = encode_content(data)
         header.length = str.size + encode_header.size
         encode_header << str
