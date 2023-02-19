@@ -17,7 +17,18 @@ module Netlink
       def ack?
         fields.error.zero?
       end
+
+      def string_error
+        return 'ACK' if fields.error.zero?
+
+        errno = SystemCallError.new('', fields.error.abs)
+        "#{errno.class.to_s.delete_prefix('Errno::')},#{errno.message.delete_suffix(' - ')}"
+      end
+
+      def inspect
+        "#<#{self.class} error=(#{fields.error},#{string_error}), @header=#{header.inspect}, @attributes=#{attributes.inspect}, @data=#{data.inspect}>"
+      end
     end
-    Msg.record_type(NLMSG_ERROR, MsgError)
+    Msg.register_type(Constants::NLMSG_ERROR, MsgError)
   end
 end

@@ -70,7 +70,6 @@ module Netlink
             sock_snd.bind(0)
             sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
             msg, = sock_recv.recvmsg
-            p msg
             expect(msg.data).to eq(data)
           end
         end
@@ -145,6 +144,14 @@ module Netlink
           ack, = sock.recvmsg
           expect(ack).to be_a(Nl::MsgError)
           expect(ack.fields.error).to eq(0)
+        end
+      end
+
+      it 'raises when receiving a Nl::MsgError' do
+        Socket.new(NETLINK_ROUTE) do |sock|
+          sock.bind(0)
+          sock.sendmsg(Nl::Msg.new(header: { type: 10_000, flags: %i[request ack] }))
+          expect { sock.recvmsg }.to raise_error(NlmError).with_message(/operation not supported/i)
         end
       end
     end

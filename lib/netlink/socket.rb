@@ -105,6 +105,8 @@ module Netlink
       mesg, sender_ai, = @socket.recvmsg(maxmesglen, flags)
       sender_ai = Addrinfo.new(sender_ai.to_s)
       nlmsg = Nl::Msg.decode(mesg)
+      raise_on_error(nlmsg)
+
       [nlmsg, sender_ai]
     end
 
@@ -121,7 +123,7 @@ module Netlink
     # @param [Integer,nil] type message type. Mandatory if +mesg+ is a String.
     # @param [Integer] flags +flags+ should be a bitwise OR of {Netlink}::NETLINK_F_* constants
     # @return [Nlmsg]
-    def create_or_update_nlmsg(mesg, type=nil, flags= 0)
+    def create_or_update_nlmsg(mesg, type=nil, flags=0)
       case mesg
       when String
         Nl::Msg.new(data: mesg, header: { type: type, flags: flags, seq: seqnum, pid: @pid })
@@ -140,6 +142,13 @@ module Netlink
       current_seqnum = @seqnum
       @seqnum += 1
       current_seqnum
+    end
+
+    def raise_on_error(msg)
+      return unless msg.is_a?(Nl::MsgError)
+      return if msg.ack?
+
+      raise NlmError, msg.string_error
     end
   end
 end
