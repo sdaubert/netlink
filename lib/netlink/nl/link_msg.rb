@@ -3,6 +3,8 @@
 module Netlink
   module Nl
     class LinkMsg < Msg
+      define_types_from_constants('RTM_', 'LINK')
+
       define_fields family: 'C',
                     unused: 'C',
                     type: 'S',

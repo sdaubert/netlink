@@ -9,5 +9,6 @@ end
 require_relative 'nl/base'
 require_relative 'nl/attr'
 require_relative 'nl/msg'
+require_relative 'nl/msg_header_mixin'
 require_relative 'nl/msg_error'
 require_relative 'nl/link_msg'

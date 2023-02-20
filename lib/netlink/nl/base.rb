@@ -65,10 +65,10 @@ module Netlink
         # On inheritage, set class variables from parent
         # @param [Class] klass
         # @return [void]
-        def inherited(klass)
+        def inherited(subclass)
           super
           parent = self
-          klass.class_eval do
+          subclass.class_eval do
             @header = parent.header.dup
             @fields = parent.fields.dup
             # @attributes = parent.attributes.dup
@@ -87,8 +87,8 @@ module Netlink
       attr_reader :data
 
       def initialize(header: {}, fields: {}, attributes: {}, data: '')
-        @header = create_struct(:header, header)
-        @fields = create_struct(:fields, fields)
+        initialize_header(header)
+        initialize_fields(fields)
         @attributes = attributes
         @data = data
       end
@@ -133,6 +133,14 @@ module Netlink
       end
 
       private
+
+      def initialize_header(header)
+        @header = create_struct(:header, header)
+      end
+
+      def initialize_fields(fields)
+        @fields = create_struct(:fields, fields)
+      end
 
       def create_struct(type, values)
         members = self.class.send(type).keys

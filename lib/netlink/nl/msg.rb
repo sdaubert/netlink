@@ -37,51 +37,54 @@ module Netlink
                     pid: 'L'
 
       # @private
-      TYPES = Constants.constants
-                       .map(&:to_s)
-                       .select { |cst| cst.start_with?('RTM_') }
-                       .to_h { |cst| [cst.delete_prefix('RTM_').to_sym, Constants.const_get(cst)]}
-      class Header
-        def human_type
-          TYPES.key(type)
-        end
-
-        def inspect
-          "#<#{self.class} length=#{length}, type=#{human_type}, flags=#{flags}, seq=#{seq}, pid=#{pid}>"
-        end
-      end
-
-      # @private
       # Associate flag symbol to its integer value
       HDR_FLAGS = Constants.constants.map(&:to_s)
                            .select { |cst| cst.start_with?('NLM_F') }
                            .to_h { |cst| [cst[6..].downcase.to_sym, Constants.const_get(cst.to_sym)] }
                            .freeze
 
-      # Decode a netlink message from +data+
-      # @param [String] data
-      # @return [Nlmsg] may be any of Nlmsg subclasses
-      def self.decode(data)
-        nlmsg = self.new
-        nlmsg.decode(data)
-        return nlmsg unless self == Msg
+      class << self
+        # Decode a netlink message from +data+
+        # @param [String] data
+        # @return [Nlmsg] may be any of Nlmsg subclasses
+        def decode(data)
+          nlmsg = self.new
+          nlmsg.decode(data)
+          return nlmsg unless self == Msg
 
-        specific_klass = @types[nlmsg.header.type]
-        return nlmsg if specific_klass.nil?
+          specific_klass = @types[nlmsg.header.type]
+          return nlmsg if specific_klass.nil?
 
-        specific_klass.decode(data)
+          specific_klass.decode(data)
+        end
+
+        # Record a class as a specific netlink message type
+        # @param [Integer] type
+        # @param [Class] klass
+        # @return [void]
+        def register_type(type, klass)
+          @types ||= {}
+          @types[type] = klass
+        end
+
+        def define_types_from_constants(prefix, suffix='')
+          self.const_set(:TYPES,
+                         Constants.constants
+                                  .map(&:to_s)
+                                  .select { |cst| cst.start_with?(prefix) && cst.end_with?(suffix) }
+                                  .to_h { |cst| [cst.delete_prefix(prefix).downcase.to_sym, Constants.const_get(cst)] })
+        end
       end
 
-      # Record a class as a specific netlink message type
-      # @param [Integer] type
-      # @param [Class] klass
-      # @return [void]
-      def self.register_type(type, klass)
-        @types ||= {}
-        @types[type] = klass
-      end
+      define_types_from_constants('NLMSG_')
 
       private
+
+      def initialize_header(header)
+        super
+        @header.extend(MsgHeaderMixin)
+        @header.types = self.class::TYPES
+      end
 
       # Encode header
       # @param [String] _body body of message
