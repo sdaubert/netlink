@@ -36,6 +36,28 @@ module Netlink
                     seq: 'L',
                     pid: 'L'
 
+      # @private
+      TYPES = Constants.constants
+                       .map(&:to_s)
+                       .select { |cst| cst.start_with?('RTM_') }
+                       .to_h { |cst| [cst.delete_prefix('RTM_').to_sym, Constants.const_get(cst)]}
+      class Header
+        def human_type
+          TYPES.key(type)
+        end
+
+        def inspect
+          "#<#{self.class} length=#{length}, type=#{human_type}, flags=#{flags}, seq=#{seq}, pid=#{pid}>"
+        end
+      end
+
+      # @private
+      # Associate flag symbol to its integer value
+      HDR_FLAGS = Constants.constants.map(&:to_s)
+                           .select { |cst| cst.start_with?('NLM_F') }
+                           .to_h { |cst| [cst[6..].downcase.to_sym, Constants.const_get(cst.to_sym)] }
+                           .freeze
+
       # Decode a netlink message from +data+
       # @param [String] data
       # @return [Nlmsg] may be any of Nlmsg subclasses
@@ -54,22 +76,51 @@ module Netlink
       # @param [Integer] type
       # @param [Class] klass
       # @return [void]
-      def self.record_type(type, klass)
+      def self.register_type(type, klass)
         @types ||= {}
         @types[type] = klass
       end
 
-      # @param [String] data
-      # @param [Header] header
-      def initialize(header: {}, fields: {}, attributes: {}, data: '')
-        super(header: header, fields: fields, attributes: attributes)
-        @data = data
+      private
+
+      # Encode header
+      # @param [String] _body body of message
+      # @return [String]
+      def encode_header(body)
+        header.flags = encode_flags(header.flags)
+        header.length = body.size + super.size
+        super
       end
 
-      def encode(data=nil)
-        str = encode_content(data)
-        header.length = str.size + encode_header.size
-        encode_header << str
+      def decode_header(data)
+        header_size = super
+        header.flags = decode_flags(header.flags)
+        header_size
+      end
+
+      def encode_flags(flags)
+        return 0 if flags.nil? || (flags.is_a?(Array) && flags.empty?)
+        return flags if flags.is_a?(Integer)
+        raise TypeError, 'unsupported type for flags' unless flags.is_a?(Array)
+
+        flags.reduce(0) { |mem, flag| mem | flag_to_integer(flag) }
+      end
+
+      def flag_to_integer(flag)
+        return flag if flag.is_a?(Integer)
+
+        HDR_FLAGS[flag] || (raise Error, "Unknown flag #{flag}")
+      end
+
+      def decode_flags(int)
+        flags = []
+        pow2 = 1
+        while pow2 <= int
+          flags << HDR_FLAGS.key(pow2) || pow2 unless (int & pow2).zero?
+          pow2 <<= 1
+        end
+
+        flags
       end
     end
   end

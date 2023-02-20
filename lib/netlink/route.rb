@@ -4,6 +4,10 @@ module Netlink
   # Route Module to handle Route family netlink protocols
   module Route
     # Get links
-    def self.links; end
+    def self.links
+      Link.get
+    end
   end
 end
+
+require_relative 'route/link'

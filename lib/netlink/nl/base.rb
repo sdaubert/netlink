@@ -6,13 +6,6 @@ module Netlink
     # @abstract Subclasses should define header, fields and/or attributes through {.define_header}, {.define_fields} and {.define_attributes}.
     class Base
       class << self
-        # @return [Class]
-        attr_reader :header_class
-        # @return [Class]
-        attr_reader :fields_class
-        # @return [Class]
-        attr_reader :attributes_class
-
         # @return [Hash<Symbol, String>]
         def header
           @header ||= {}
@@ -23,9 +16,17 @@ module Netlink
           @fields ||= {}
         end
 
-        # @return [Hash<Symbol, String>]
+        # @return [Hash<Symbol, Class>]
         def attributes
           @attributes ||= {}
+        end
+
+        def attributes_from_number
+          @attributes_from_number ||= {}
+        end
+
+        def attribute_names_from_number
+          @attribute_names_from_number ||= {}
         end
 
         # Define header
@@ -33,7 +34,8 @@ module Netlink
         # @return [void]
         def define_header(**kwargs)
           @header = kwargs
-          @header_class = Struct.new(*kwargs.keys, keyword_init: true)
+          keys = kwargs.keys << :msg
+          self.const_set(:Header, Struct.new(*keys, keyword_init: true))
         end
 
         # Define fields
@@ -41,15 +43,17 @@ module Netlink
         # @return [void]
         def define_fields(**kwargs)
           @fields = kwargs
-          @fields_class = Struct.new(*kwargs.keys, keyword_init: true)
+          keys = kwargs.keys << :msg
+          self.const_set(:Fields, Struct.new(*keys, keyword_init: true))
         end
 
         # Define attributes
-        # @param [Hash<Symbol,String>] kwargs keys are attribute name, and values are their pack string
+        # @param [Hash<Symbol,Class>] kwargs keys are attribute name, and values are {Attr} subclasses
         # @return [void]
-        def define_attributes(**kwargs)
+        def define_attributes(prefix:, **kwargs)
           @attributes = kwargs
-          @attributes_class = Struct.new(*kwargs.keys, keyword_init: true)
+          @attributes_from_number = kwargs.keys.to_h { |name| [Constants.const_get("#{prefix}#{name.to_s.upcase}"), kwargs[name]] }
+          @attribute_names_from_number = kwargs.keys.to_h { |name| [Constants.const_get("#{prefix}#{name.to_s.upcase}"), name] }
         end
 
         # Align parameter, as bytes
@@ -66,11 +70,8 @@ module Netlink
           parent = self
           klass.class_eval do
             @header = parent.header.dup
-            @header_class = parent.header_class
             @fields = parent.fields.dup
-            @fields_class = parent.fields_class
-            @attributes = parent.attributes.dup
-            @attributes_class = parent.attributes_class
+            # @attributes = parent.attributes.dup
           end
         end
       end
@@ -79,17 +80,17 @@ module Netlink
       attr_reader :header
       # @return [Struct]
       attr_reader :fields
-      # @return [Struct]
+      # @return [Hash<Symbol,Attr>]
       attr_reader :attributes
       # Supplementary data
       # @return [String]
       attr_reader :data
 
-      def initialize(header: {}, fields: {}, attributes: {})
+      def initialize(header: {}, fields: {}, attributes: {}, data: '')
         @header = create_struct(:header, header)
         @fields = create_struct(:fields, fields)
-        @attributes = create_struct(:attributes, attributes)
-        @data = ''
+        @attributes = attributes
+        @data = data
       end
 
       # Encode message
@@ -97,7 +98,7 @@ module Netlink
       # @return [String] encoded netlink data as binary String
       def encode(data=nil)
         str = encode_content(data)
-        encode_header << str
+        encode_header(str) << str
       end
 
       # Encode message content. i.e. encode fields, attributes and supplementary data
@@ -112,11 +113,15 @@ module Netlink
       # @param [String] data
       # @return [self]
       def decode(data)
-        header_size = base_decode(self.class.header, header, data)
-        fields_size = base_decode(self.class.fields, fields, data[header_size..])
-        no_attr_size = header_size + fields_size
-        attr_size = base_decode(self.class.attributes, attributes, data[no_attr_size..])
-        @data = data[(no_attr_size + attr_size)..]
+        header_size = decode_header(data)
+        data = data[0...header.length]
+        fields_size = decode_fields(data[header_size..])
+        preambule_size = header_size + fields_size
+        if self.class.attributes.empty?
+          @data = data[preambule_size..]&.b
+        else
+          decode_attributes(data[preambule_size..])
+        end
         self
       end
 
@@ -134,11 +139,14 @@ module Netlink
         return if members.empty?
 
         default_values = members.to_h { |m| [m, 0] }
-        klass = self.class.send("#{type}_class".to_sym)
+        default_values[:msg] = self
+        klass = self.class.const_get(type.capitalize)
         klass.new(default_values.merge(values))
       end
 
-      def encode_header
+      # @param [String] _body body of message
+      # @return [String]
+      def encode_header(_body)
         base_encode(self.class.header, header)
       end
 
@@ -147,7 +155,7 @@ module Netlink
       end
 
       def encode_attributes
-        base_encode(self.class.attributes, attributes)
+        @attributes.map { |nla| pad(nla.encode) }.join
       end
 
       # @param [Hash<Symbol, String>] klass_def
@@ -165,6 +173,29 @@ module Netlink
         pad(ary.pack(pack_str))
       end
 
+      def decode_header(data)
+        base_decode(self.class.header, header, data)
+      end
+
+      def decode_fields(data)
+        base_decode(self.class.fields, fields, data)
+      end
+
+      def decode_attributes(data)
+        size = 0
+
+        until data.nil? || data.empty?
+          nla = Attr.decode(data,
+                            known_attributes: self.class.attributes_from_number,
+                            attribute_names: self.class.attribute_names_from_number)
+          data = data[nla.padded_length..]
+          size += nla.padded_length
+          @attributes[nla.human_type] = nla
+        end
+
+        size
+      end
+
       # @param [Hash<Symbol, String>] klass_def
       # @param [Hash<Symbol, Integer>] values
       # @param [String] data
@@ -174,9 +205,10 @@ module Netlink
 
         pack_str = klass_def.values.join
         ary = data.unpack(pack_str)
+        size = pad(ary.pack(pack_str)).size
         values.members.each { |m| values[m] = ary.shift }
 
-        pad(([0] * pack_str.size).pack(pack_str)).size
+        size
       end
     end
   end
