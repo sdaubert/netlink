@@ -84,7 +84,7 @@ module Netlink
     end
 
     # Send +mesg+ via socket
-    # @param [String, NlMsg] mesg message to send
+    # @param [String, Nl::Msg] mesg message to send
     # @param [Integer] nlm_type Message Type
     # @param [Integer] nlm_flags Netlink message flags. Should be a bitwise OR of {Netlink}::NLM_F_* constants
     # @param [Integer] flags +flags+ Socket flags. Should be a bitwise OR of {::Socket}::MSG_* constants
@@ -98,7 +98,7 @@ module Netlink
     # Receive a message
     # @param [Integer] maxmesglen maximum number of bytes to receive as message
     # @param [Integer] flags +flags+ should be a bitwise OR of {::Socket}::MSG_* constants
-    # @return [Array(Nlmsg, Addrinfo)]
+    # @return [Array(Nl::Msg, Addrinfo)]
     # @raise [NlmsgError]
     def recvmsg(maxmesglen=nil, flags=0)
       maxmesglen ||= @default_buffer_size
@@ -110,6 +110,22 @@ module Netlink
       [nlmsg, sender_ai]
     end
 
+    # Receive all response messages at once (if multi)
+    # @param [Integer] flags +flags+ should be a bitwise OR of {::Socket}::MSG_* constants
+    # @return [Array<Nl::Mesg>]
+    def recv_all(flags=0)
+      msg, = recvmsg(nil, flags)
+      return [msg] unless msg.header.flags.include?(:multi)
+
+      ary = []
+      while msg.header.type != Constants::NLMSG_DONE
+        ary << msg
+        msg, = recvmsg(nil, flags)
+      end
+
+      ary
+    end
+
     # Return underlying IO object.
     # @return [IO]
     def to_io
@@ -118,11 +134,11 @@ module Netlink
 
     private
 
-    # Create a NlMsg from +mesg+ by adding header and padding
+    # Create a {Nl::Msg} from +mesg+ by adding header and padding
     # @param [Nlmsg,String] mesg
     # @param [Integer,nil] type message type. Mandatory if +mesg+ is a String.
     # @param [Integer] flags +flags+ should be a bitwise OR of {Netlink}::NETLINK_F_* constants
-    # @return [Nlmsg]
+    # @return [Nl::Msg]
     def create_or_update_nlmsg(mesg, type=nil, flags=0)
       case mesg
       when String

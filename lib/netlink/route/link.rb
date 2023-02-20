@@ -10,8 +10,7 @@ module Netlink
         socket = Socket.new(Constants::NETLINK_ROUTE)
         socket.bind(0)
         socket.sendmsg(Nl::LinkMsg.getlink)
-        response, = socket.recvmsg
-        from_msg(response)
+        socket.recv_all.map { |msg| from_msg(msg) }
       end
 
       def self.from_msg(msg)
