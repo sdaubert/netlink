@@ -6,6 +6,8 @@ module Netlink
     class Link
       attr_accessor :name, :group, :ifindex, :address, :broadcast_address, :mtu, :flags, :tx_queue_length, :operational_state, :mode, :ifalias, :hwtype, :qdisc, :promiscuity, :num_rx_queues, :num_tx_queues
 
+      # Get information on all devices
+      # @return [Array<Link>]
       def self.get
         socket = Socket.new(Constants::NETLINK_ROUTE)
         socket.bind(0)
@@ -13,6 +15,9 @@ module Netlink
         socket.recv_all.map { |msg| from_msg(msg) }
       end
 
+      # Create a new {Link} from a {Nl::LinkMsg}
+      # @param [Nl::LinkMsg] msg
+      # @return [Link]
       def self.from_msg(msg)
         new(msg.attributes[:ifname].value,
             msg.attributes[:group].value,
@@ -32,6 +37,22 @@ module Netlink
             msg.attributes[:num_rx_queues].value)
       end
 
+      # @param [String] name
+      # @param [Integer] group
+      # @param [Integer] ifindex
+      # @param [String] address
+      # @param [String] broadcast
+      # @param [Integer] mtu
+      # @param [Array<Symbol>] flags
+      # @param [Integer] txqlen
+      # @param [Integer] operstate
+      # @param [Integer] mode
+      # @param [String,nil] ifalias
+      # @param [Symbol] hwtype
+      # @param [String] qdisc
+      # @param [Integer] promiscuity
+      # @param [Integer] num_rx_queues
+      # @param [Integer] num_tx_queues
       def initialize(name, group, ifindex, address, broadcast, mtu, flags, txqlen, operstate, mode, ifalias, hwtype, qdisc, promiscuity, num_rx_queues, num_tx_queues)
         @name = name
         @group = group

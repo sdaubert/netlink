@@ -57,7 +57,7 @@ module Netlink
     def initialize(family)
       @family = family
       @pid = self.class.generate_pid
-      @socket = ::Socket.new(AF_NETLINK, ::Socket::SOCK_RAW, family)
+      @socket = ::Socket.new(AF_NETLINK, :SOCK_RAW, family)
       @seqnum = 1
       @default_buffer_size = DEFAULT_BUFFER_SIZE
       @groups = 0

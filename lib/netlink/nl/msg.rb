@@ -40,7 +40,7 @@ module Netlink
       # Associate flag symbol to its integer value
       HDR_FLAGS = Constants.constants.map(&:to_s)
                            .select { |cst| cst.start_with?('NLM_F') }
-                           .to_h { |cst| [cst[6..].downcase.to_sym, Constants.const_get(cst.to_sym)] }
+                           .to_h { |cst| [cst.delete_prefix('NLM_F_').downcase.to_sym, Constants.const_get(cst.to_sym)] }
                            .freeze
 
       class << self
@@ -67,6 +67,11 @@ module Netlink
           @types[type] = klass
         end
 
+        # @private
+        # Helper to define TYPES constant from chosen constants from {Constant}
+        # @param [String] prefix
+        # @param [String] suffix
+        # @return [void]
         def define_types_from_constants(prefix, suffix='')
           self.const_set(:TYPES,
                          Constants.constants
@@ -80,21 +85,21 @@ module Netlink
 
       private
 
+      # @see Base#initialize_header
       def initialize_header(header)
         super
         @header.extend(MsgHeaderMixin)
         @header.types = self.class::TYPES
       end
 
-      # Encode header
-      # @param [String] _body body of message
-      # @return [String]
+      # @see Base#encode_header
       def encode_header(body)
         header.flags = encode_flags(header.flags)
         header.length = body.size + super.size
         super
       end
 
+      # @see Base#decode_header
       def decode_header(data)
         header_size = super
         header.flags = decode_flags(header.flags)
@@ -115,7 +120,8 @@ module Netlink
         HDR_FLAGS[flag] || (raise Error, "Unknown flag #{flag}")
       end
 
-      def decode_flags(int)
+      def decode_flags(int_or_flags)
+        int = int_or_flags.is_a?(Array) ? encode_flags(int_or_flags) : int_or_flags.to_i
         flags = []
         pow2 = 1
         while pow2 <= int

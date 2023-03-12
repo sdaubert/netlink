@@ -7,7 +7,7 @@ module Netlink
       define_fields error: 'i'
 
       # @param [Integer] error
-      # @param [Nlmsg::Header] orig_header
+      # @param [Hash] orig_header
       def initialize(error: 0, orig_header: {})
         super(header: orig_header, fields: { error: error })
       end

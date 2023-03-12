@@ -5,6 +5,9 @@ module Netlink
     # Base class for netlink protocol data
     # @abstract Subclasses should define header, fields and/or attributes through {.define_header}, {.define_fields} and {.define_attributes}.
     class Base
+      # @private
+      VoidStruct = Struct.new(:unused)
+
       class << self
         # @return [Hash<Symbol, String>]
         def header
@@ -21,10 +24,12 @@ module Netlink
           @attributes ||= {}
         end
 
+        # @return [Hash<Integer,Class>]
         def attributes_from_number
           @attributes_from_number ||= {}
         end
 
+        # @return [Hash<Integer,Symbol>]
         def attribute_names_from_number
           @attribute_names_from_number ||= {}
         end
@@ -63,7 +68,7 @@ module Netlink
         end
 
         # On inheritage, set class variables from parent
-        # @param [Class] klass
+        # @param [Class] subclass
         # @return [void]
         def inherited(subclass)
           super
@@ -86,6 +91,10 @@ module Netlink
       # @return [String]
       attr_reader :data
 
+      # @param [Hash] header
+      # @param [Hash] fields
+      # @param [Hash] attributes
+      # @param [String] data
       def initialize(header: {}, fields: {}, attributes: {}, data: '')
         initialize_header(header)
         initialize_fields(fields)
@@ -94,7 +103,7 @@ module Netlink
       end
 
       # Encode message
-      # @param [String,nil]] data supplementary data to add to message
+      # @param [String,nil] data supplementary data to add to message
       # @return [String] encoded netlink data as binary String
       def encode(data=nil)
         str = encode_content(data)
@@ -144,7 +153,7 @@ module Netlink
 
       def create_struct(type, values)
         members = self.class.send(type).keys
-        return if members.empty?
+        return VoidStruct.new(:void) if members.empty?
 
         default_values = members.to_h { |m| [m, 0] }
         default_values[:msg] = self
