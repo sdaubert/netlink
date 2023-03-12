@@ -19,6 +19,17 @@ module Netlink
       def types=(types)
         @types = types
       end
+
+      def flag_multi?
+        case flags
+        when Array
+          flags.include?(:multi) || flags.include?(Constants::NLM_F_MULTI)
+        when Integer
+          (flags & Constants::NLM_F_MULTI) == Constants::NLM_F_MULTI
+        else
+          false
+        end
+      end
     end
   end
 end

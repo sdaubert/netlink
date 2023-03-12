@@ -115,7 +115,7 @@ module Netlink
     # @return [Array<Nl::Mesg>]
     def recv_all(flags=0)
       msg, = recvmsg(nil, flags)
-      return [msg] unless msg.header.flags.include?(:multi)
+      return [msg] unless msg.header.flag_multi?
 
       ary = []
       while msg.header.type != Constants::NLMSG_DONE
