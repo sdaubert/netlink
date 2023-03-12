@@ -57,8 +57,8 @@ module Netlink
         # @return [void]
         def define_attributes(prefix:, **kwargs)
           @attributes = kwargs
-          @attributes_from_number = kwargs.keys.to_h { |name| [Constants.const_get("#{prefix}#{name.to_s.upcase}"), kwargs[name]] }
-          @attribute_names_from_number = kwargs.keys.to_h { |name| [Constants.const_get("#{prefix}#{name.to_s.upcase}"), name] }
+          @attributes_from_number = kwargs.keys.to_h { |name| [Constants.const_get("#{prefix}#{name.to_s.upcase}").to_i, kwargs[name]] }
+          @attribute_names_from_number = kwargs.keys.to_h { |name| [Constants.const_get("#{prefix}#{name.to_s.upcase}").to_i, name] }
         end
 
         # Align parameter, as bytes
@@ -76,7 +76,6 @@ module Netlink
           subclass.class_eval do
             @header = parent.header.dup
             @fields = parent.fields.dup
-            # @attributes = parent.attributes.dup
           end
         end
       end
@@ -124,11 +123,11 @@ module Netlink
       def decode(data)
         header_size = decode_header(data)
         data = data[0...header.length]
-        fields_size = decode_fields(data[header_size..])
+        fields_size = decode_fields(data&.slice(header_size..))
         preambule_size = header_size + fields_size
         if self.class.attributes.empty?
-          @data = data[preambule_size..]&.b
-        else
+          @data = data&.slice(preambule_size..)&.b || ''
+        elsif !data.nil?
           decode_attributes(data[preambule_size..])
         end
         self
@@ -172,7 +171,7 @@ module Netlink
       end
 
       def encode_attributes
-        @attributes.map { |nla| pad(nla.encode) }.join
+        @attributes.values.map { |nla| pad(nla.encode) }.join
       end
 
       # @param [Hash<Symbol, String>] klass_def
@@ -205,20 +204,20 @@ module Netlink
           nla = Attr.decode(data,
                             known_attributes: self.class.attributes_from_number,
                             attribute_names: self.class.attribute_names_from_number)
-          data = data[nla.padded_length..]
+          data = data[nla.padded_length..].to_s
           size += nla.padded_length
-          @attributes[nla.human_type] = nla
+          nla_name = nla.human_type
+          raise Error, "Unknown attribute type #{nla.type}" if nla_name.is_a?(Integer)
+
+          @attributes[nla_name.to_sym] = nla
         end
 
         size
       end
 
-      # @param [Hash<Symbol, String>] klass_def
-      # @param [Hash<Symbol, Integer>] values
-      # @param [String] data
-      # @return [Integer] size of padded decoded data
       def base_decode(klass_def, values, data)
         return 0 if klass_def.empty?
+        return 0 if data.nil?
 
         pack_str = klass_def.values.join
         ary = data.unpack(pack_str)

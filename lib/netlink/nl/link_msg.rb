@@ -112,12 +112,12 @@ module Netlink
       FIELDS_FLAGS = Constants.constants
                               .map(&:to_s)
                               .select { |cst| cst.start_with?('IFF_') }
-                              .to_h { |cst| [cst[4..].downcase.to_sym, Constants.const_get(cst.to_sym)] }
+                              .to_h { |cst| [cst.delete_prefix('IFF_').downcase.to_sym, Constants.const_get(cst.to_sym)] }
                               .freeze
 
       class Fields
         def human_type
-          LL_TYPES.key(type)
+          LL_TYPES.key(type).to_s || type
         end
 
         def inspect
@@ -165,10 +165,11 @@ module Netlink
         return flags if flags.is_a?(Integer)
         raise TypeError, 'unsupported type for flags' unless flags.is_a?(Array)
 
-        flags.reduce(0) { |mem, flag| mem | (flag.is_a?(Integer) ? flag : FIELD_FLAGS[flag] || (raise Error, "Unknwon flag #{flag}")) }
+        flags.reduce(0) { |mem, flag| mem | (flag.is_a?(Integer) ? flag : FIELDS_FLAGS[flag] || (raise Error, "Unknwon flag #{flag}")) }
       end
 
-      def decode_fields_flags(int)
+      def decode_fields_flags(int_or_flags)
+        int = int_or_flags.is_a?(Array) ? encode_fields_flags(int_or_flags) : int_or_flags.to_i
         flags = []
         pow2 = 1
         while pow2 <= int
