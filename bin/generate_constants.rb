@@ -89,8 +89,9 @@ def generate_ifla_constants(io)
   end
 end
 
-def generate_iff_constants(io)
+def generate_if_constants(io)
   generate_constants_from_enum(io, 'IFF_', 'linux/if.h')
+  generate_constants_from_enum(io, 'IF_OPER', 'linux/if.h')
 end
 
 filename = File.join(BaseDir, 'lib', 'netlink', 'constants.rb')
@@ -104,7 +105,7 @@ File.open(filename, 'w') do |f|
   generate_nlmsg_constants(f)
   generate_rtm_constants(f)
   generate_ifla_constants(f)
-  generate_iff_constants(f)
+  generate_if_constants(f)
 
   f.write("  end\nend\n")
 end

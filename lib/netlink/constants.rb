@@ -568,5 +568,12 @@ module Netlink
     IFF_LOWER_UP = 1<<16
     IFF_DORMANT = 1<<17
     IFF_ECHO = 1<<18
+    IF_OPER_UNKNOWN = 0
+    IF_OPER_NOTPRESENT = 1
+    IF_OPER_DOWN = 2
+    IF_OPER_LOWERLAYERDOWN = 3
+    IF_OPER_TESTING = 4
+    IF_OPER_DORMANT = 5
+    IF_OPER_UP = 6
   end
 end
