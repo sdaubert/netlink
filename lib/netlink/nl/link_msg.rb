@@ -117,7 +117,13 @@ module Netlink
 
       class Fields
         def human_type
-          LL_TYPES.key(type).to_s || type
+          LL_TYPES.key(type) || type
+        end
+
+        def human_type=(sym)
+          raise ArgumentError, "unknown type" unless LL_TYPES.keys.include?(sym)
+
+          self.type = LL_TYPES[sym]
         end
 
         def inspect

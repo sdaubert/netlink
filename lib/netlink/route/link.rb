@@ -1,10 +1,14 @@
 # frozen_string_literal: true
+require 'awesome_print'
 
 module Netlink
   module Route
     # Handle physical and virtual network devices through Netlink Route protocol.
     class Link
       attr_accessor :name, :group, :ifindex, :address, :broadcast_address, :mtu, :flags, :tx_queue_length, :operational_state, :mode, :ifalias, :hwtype, :qdisc, :promiscuity, :num_rx_queues, :num_tx_queues
+
+      OPER_STATES = Constants.constants.select { |cst| cst.to_s.start_with?('IF_OPER') }
+                             .to_h { |cst| [cst[8..].downcase.to_sym, Constants.const_get(cst)] }
 
       # Get information on all devices
       # @return [Array<Link>]
@@ -21,57 +25,47 @@ module Netlink
       # @param [Nl::LinkMsg] msg
       # @return [Link]
       def self.from_msg(msg)
-        new(msg.attributes[:ifname].value,
-            msg.attributes[:group].value,
-            msg.fields.index,
-            msg.attributes[:address].value,
-            msg.attributes[:broadcast].value,
-            msg.attributes[:mtu].value,
-            msg.fields.flags,
-            msg.attributes[:txqlen].value,
-            msg.attributes[:operstate].value,
-            msg.attributes[:linkmode].value,
-            msg.attributes[:ifalias]&.value,
-            msg.fields.human_type,
-            msg.attributes[:qdisc].value,
-            msg.attributes[:promiscuity].value,
-            msg.attributes[:num_rx_queues].value,
-            msg.attributes[:num_rx_queues].value)
+        lnk = new(msg.attributes[:ifname].value, msg.fields.flags)
+        lnk.address = msg.attributes[:address].value
+        lnk.broadcast_address = msg.attributes[:broadcast].value
+        lnk.group = msg.attributes[:group].value
+        lnk.ifindex = msg.fields.index
+        lnk.mtu = msg.attributes[:mtu].value
+        lnk.tx_queue_length = msg.attributes[:txqlen].value
+        lnk.operational_state = msg.attributes[:operstate].value
+        lnk.mode = msg.attributes[:linkmode].value
+        lnk.ifalias = msg.attributes[:ifalias]&.value
+        lnk.qdisc = msg.attributes[:qdisc].value
+        lnk.promiscuity = msg.attributes[:promiscuity].value
+        lnk.num_rx_queues = msg.attributes[:num_rx_queues].value
+        lnk.num_tx_queues = msg.attributes[:num_tx_queues].value
+        lnk.hwtype = msg.fields.human_type
+
+         lnk
       end
 
       # @param [String] name
-      # @param [Integer] group
-      # @param [Integer] ifindex
       # @param [String] address
       # @param [String] broadcast
-      # @param [Integer] mtu
       # @param [Array<Symbol>] flags
-      # @param [Integer] txqlen
-      # @param [Integer] operstate
-      # @param [Integer] mode
-      # @param [String,nil] ifalias
-      # @param [Symbol] hwtype
-      # @param [String] qdisc
-      # @param [Integer] promiscuity
-      # @param [Integer] num_rx_queues
-      # @param [Integer] num_tx_queues
-      def initialize(name, group, ifindex, address, broadcast, mtu, flags, txqlen, operstate, mode, ifalias, hwtype, qdisc, promiscuity, num_rx_queues, num_tx_queues)
+      def initialize(name, flags=[])
+        @type = nil
         @name = name
-        @group = group
-        @ifindex = ifindex
-        @address = address
-        @broadcast_address = broadcast
-        @mtu = mtu
+        @address = ''
+        @broadcast_address = ''
         @flags = flags
-        @tx_queue_length = txqlen
-        @operational_state = operstate
-        @mode = mode
-        @ifalias = ifalias
-        @hwtype = hwtype
-        @qdisc = qdisc
-        @promiscuity = promiscuity
-        @num_rx_queues = num_rx_queues
-        @num_tx_queues = num_tx_queues
+        @group = -1
+        @ifindex = 0
+        @mtu = 1500
+        @tx_queue_length = -1
+        @operational_state = :down
+        @mode = 0
+        @ifalias = nil
+        @hwtype = :ETHER
+        @qdisc = 'noqueue'
+        @promiscuity = 0
+        @num_rx_queues = -1
+        @num_tx_queues = -1
       end
 
       # Update a link
@@ -87,37 +81,64 @@ module Netlink
       end
 
       # Create a link. Only virtual network devices may be created.
-      def create
+      def create(type)
         socket = Socket.new(Constants::NETLINK_ROUTE)
         socket.bind(0)
         msg = Nl::LinkMsg.newlink
-        msg.flags << :create
+        @type = type
         update_msg(msg)
+        msg.header.flags << :create << :excl
+        ap msg
         socket.sendmsg(msg)
         socket.recvmsg
       ensure
         socket.close
       end
 
-      private
 
       def update_msg(msg)
-        msg.attributes[:ifname] = Nl::Attr::String.new(value: @name)
-        msg.attributes[:group] = Nl::Attr::U32.new(value: @group)
+        msg.add_attribute(:ifname, @name)
+        msg.add_attribute(:address, @address) unless @address.empty?
+        msg.add_attribute(:broadcast, @broadcast_address) unless @broadcast_address.empty?
+        #msg.add_attribute(:mtu, @mtu)
+        #msg.add_attribute(:operstate, operstate_to_int(@operational_state))
+        #msg.add_attribute(:linkmode, @mode)
+        #msg.add_attribute(:qdisc, @qdisc)
+        #msg.add_attribute(:promiscuity, @promiscuity)
+
+        msg.add_attribute(:group, @group) unless @group == -1
+        msg.add_attribute(:txqlen, @tx_queue_length) unless @tx_queue_length == -1
+        msg.add_attribute(:ifalias, @ifalias) unless @ifalias.nil?
+        msg.add_attribute(:num_rx_queues, @num_rx_queues) unless @num_rx_queues == -1
+        msg.add_attribute(:num_tx_queues, @num_tx_queues) unless @num_tx_queues == -1
+
+        add_linkinfo(msg, @type)
+
         msg.fields.index = @ifindex
-        msg.attributes[:address] = Nl::Attr::MacAddr.new(value: @address)
-        msg.attributes[:broacast] = Nl::Attr::MacAddr.new(value: @broadcast_address)
-        msg.attributes[:mtu] = Nl::Attr::U32.new(value: @mtu)
         msg.fields.flags = @flags
-        msg.attributes[:txqlen] = Nl::Attr::U32.new(value: @tx_queue_length)
-        msg.attributes[:operstate] = Nl::Attr::U8.new(value: @operational_state)
-        msg.attributes[:linkmmode] = Nl::Attr::U8.new(value: @mode)
-        msg.attributes[:ifalias] = Nl::Attr::String.new(value: @ifalias)
-        msg.fields.type = LinkMsg::LL_TYPES[@hwtype]
-        msg.attributes[:qdisc] = Nl::Attr::String.new(value: @qdisc)
-        msg.attributes[:promiscuity] = Nl::Attr::U32.new(value: @promiscuity)
-        msg.attributes[:num_rx_queues] = Nl::Attr::U32.new(value: @num_rx_queues)
-        msg.attributes[:num_tx_queues] = Nl::Attr::U32.new(value: @num_tx_queues)
+        msg.fields.human_type = @hwtype
+      end
+
+      def operstate_to_sym(val)
+        return val if val.is_a?(Symbol)
+
+        OPER_STATES.key(val) || val
+      end
+
+      def operstate_to_int(val)
+        return val if val.is_a?(Integer)
+
+        OPER_STATES[val] || (raise IndexError, "Unknown operstate #{val}")
+      end
+
+      def add_linkinfo(msg, kind)
+        return if kind.nil? || kind.empty?
+
+        @hwtype = :NETROM
+        li = Nl::Attr::LinkInfo.new
+        li.add_attribute(:kind, kind)
+        p li
+        msg.attributes[:linkinfo] = li
       end
     end
   end
