@@ -31,7 +31,7 @@ module Netlink
       # @see Base#initialize
       # @param [Hash<Integer,Class>] known_attributes
       # @param [Hash<Integer,Symbol>] attribute_names
-      def initialize(header: {}, fields: {}, attributes: [], data: '', known_attributes: {}, attribute_names: {})
+      def initialize(header: {}, fields: {}, attributes: {}, data: '', known_attributes: {}, attribute_names: {})
         super(header: header, fields: fields, attributes: attributes, data: data)
         @known_attributes = known_attributes
         @attribute_names = attribute_names
@@ -61,7 +61,7 @@ module Netlink
 
        # @return [String,Integer]
       def human_type
-        attribute_names[type].to_s || type
+        attribute_names[type] || type
       end
 
       # Return current value of attribute
@@ -74,6 +74,15 @@ module Netlink
         type_str = human_type.inspect
         "#<#{self.class} type=#{type_str}, length=#{length}, value=#{value.inspect}"
       end
+
+      private
+
+      # @see Base#encode_header
+      def encode_header(body)
+        header.length = body.size + super.size
+        super
+      end
+
 
       # Unspecified attribute
       class Unspec < Attr; end
@@ -116,6 +125,23 @@ module Netlink
 
         def encode_fields
           pad(fields.value.split(':').map { |v| v.to_i(16) }.pack(self.class.fields.values.first))
+        end
+      end
+
+      class LinkInfo < Attr
+        define_attributes prefix: 'IFLA_INFO_',
+                          kind: String,
+                          data: Unspec
+
+        def initialize(header: {}, fields: {}, attributes: {}, data: '', known_attributes: {}, attribute_names: {})
+          header[:type] ||= Constants::IFLA_LINKINFO
+          super
+        end
+
+        # @return [String]
+        def inspect
+          type_str = human_type.inspect
+          "#<#{self.class} type=#{type_str}, length=#{length}, value=#{attributes.inspect}"
         end
       end
     end

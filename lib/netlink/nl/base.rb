@@ -6,7 +6,7 @@ module Netlink
     # @abstract Subclasses should define header, fields and/or attributes through {.define_header}, {.define_fields} and {.define_attributes}.
     class Base
       # @private
-      VoidStruct = Struct.new(:unused)
+      VoidStruct = Struct.new(:value)
 
       class << self
         # @return [Hash<Symbol, String>]
@@ -140,6 +140,17 @@ module Netlink
         data.b << "\x00" * -(data.size % -self.class.align)
       end
 
+      # Add/modify an attribute
+      # @param [Symbol] kind attribute type
+      # @param [Object] value attribute value
+      def add_attribute(kind, value)
+        kind_int = self.class.attribute_names_from_number.key(kind)
+        raise ArgumentError, "Unknown attribute type #{kind.inspect}" if kind_int.nil?
+
+        attr_klass = self.class.attributes_from_number[kind_int]
+        attributes[kind] = attr_klass.new(header: { type: kind_int }, fields: { value: value })
+      end
+
       private
 
       def initialize_header(header)
@@ -152,7 +163,7 @@ module Netlink
 
       def create_struct(type, values)
         members = self.class.send(type).keys
-        return VoidStruct.new(:void) if members.empty?
+        return VoidStruct.new(nil) if members.empty?
 
         default_values = members.to_h { |m| [m, 0] }
         default_values[:msg] = self
@@ -207,9 +218,8 @@ module Netlink
           data = data[nla.padded_length..].to_s
           size += nla.padded_length
           nla_name = nla.human_type
-          raise Error, "Unknown attribute type #{nla.type}" if nla_name.is_a?(Integer)
 
-          @attributes[nla_name.to_sym] = nla
+          @attributes[nla_name] = nla
         end
 
         size
