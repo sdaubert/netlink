@@ -6,7 +6,6 @@ source 'https://rubygems.org'
 gemspec
 
 group :development do
-gem 'awesome_print'
   gem 'debase', '~>0.2'
   gem 'ruby-debug-ide', '~> 0.7'
   gem 'solargraph', '~>0.22', require: false

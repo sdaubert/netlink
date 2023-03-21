@@ -1,5 +1,4 @@
 # frozen_string_literal: true
-require 'awesome_print'
 
 module Netlink
   module Route
@@ -88,7 +87,6 @@ module Netlink
         @type = type
         update_msg(msg)
         msg.header.flags << :create << :excl
-        ap msg
         socket.sendmsg(msg)
         socket.recvmsg
       ensure
