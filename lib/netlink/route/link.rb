@@ -13,6 +13,8 @@ module Netlink
         socket.bind(0)
         socket.sendmsg(Nl::LinkMsg.getlink)
         socket.recv_all.map { |msg| from_msg(msg) }
+      ensure
+        socket.close
       end
 
       # Create a new {Link} from a {Nl::LinkMsg}
@@ -70,6 +72,52 @@ module Netlink
         @promiscuity = promiscuity
         @num_rx_queues = num_rx_queues
         @num_tx_queues = num_tx_queues
+      end
+
+      # Update a link
+      def update
+        socket = Socket.new(Constants::NETLINK_ROUTE)
+        socket.bind(0)
+        msg = Nl::LinkMsg.newlink
+        update_msg(msg)
+        socket.sendmsg(msg)
+        socket.recvmsg
+      ensure
+        socket.close
+      end
+
+      # Create a link. Only virtual network devices may be created.
+      def create
+        socket = Socket.new(Constants::NETLINK_ROUTE)
+        socket.bind(0)
+        msg = Nl::LinkMsg.newlink
+        msg.flags << :create
+        update_msg(msg)
+        socket.sendmsg(msg)
+        socket.recvmsg
+      ensure
+        socket.close
+      end
+
+      private
+
+      def update_msg(msg)
+        msg.attributes[:ifname] = Nl::Attr::String.new(value: @name)
+        msg.attributes[:group] = Nl::Attr::U32.new(value: @group)
+        msg.fields.index = @ifindex
+        msg.attributes[:address] = Nl::Attr::MacAddr.new(value: @address)
+        msg.attributes[:broacast] = Nl::Attr::MacAddr.new(value: @broadcast_address)
+        msg.attributes[:mtu] = Nl::Attr::U32.new(value: @mtu)
+        msg.fields.flags = @flags
+        msg.attributes[:txqlen] = Nl::Attr::U32.new(value: @tx_queue_length)
+        msg.attributes[:operstate] = Nl::Attr::U8.new(value: @operational_state)
+        msg.attributes[:linkmmode] = Nl::Attr::U8.new(value: @mode)
+        msg.attributes[:ifalias] = Nl::Attr::String.new(value: @ifalias)
+        msg.fields.type = LinkMsg::LL_TYPES[@hwtype]
+        msg.attributes[:qdisc] = Nl::Attr::String.new(value: @qdisc)
+        msg.attributes[:promiscuity] = Nl::Attr::U32.new(value: @promiscuity)
+        msg.attributes[:num_rx_queues] = Nl::Attr::U32.new(value: @num_rx_queues)
+        msg.attributes[:num_tx_queues] = Nl::Attr::U32.new(value: @num_tx_queues)
       end
     end
   end

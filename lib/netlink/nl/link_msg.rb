@@ -136,8 +136,16 @@ module Netlink
       end
 
       class << self
+        # Create a new GETLINK message
+        # @return [LinkMsg]
         def getlink
           new(header: { type: Constants::RTM_GETLINK, flags: %i[request ack dump] })
+        end
+
+        # Create a new NEWLINK message (to create a new link, or update an existing one)
+        # @return [LinkMsg]
+        def newlink
+          new(header: { type: Constants::RTM_NEWLINK, flags: %i[request ack] })
         end
       end
 
