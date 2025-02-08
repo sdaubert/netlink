@@ -14,8 +14,9 @@ module Netlink
       def self.get
         socket = Socket.new(Constants::NETLINK_ROUTE)
         socket.bind(0)
-        socket.sendmsg(Nl::LinkMsg.getlink)
-        socket.recv_all.map { |msg| from_msg(msg) }
+        msg = PacketGen::Packet.gen('Nl::Msg').add('Nl::Link')
+        socket.sendmsg(msg)
+        socket.recv_all.map { |rmsg| from_msg(rmsg) }
       ensure
         socket.close
       end
@@ -40,7 +41,7 @@ module Netlink
         lnk.num_tx_queues = msg.attributes[:num_tx_queues].value
         lnk.hwtype = msg.fields.human_type
 
-         lnk
+        lnk
       end
 
       # @param [String] name
@@ -93,16 +94,15 @@ module Netlink
         socket.close
       end
 
-
       def update_msg(msg)
         msg.add_attribute(:ifname, @name)
         msg.add_attribute(:address, @address) unless @address.empty?
         msg.add_attribute(:broadcast, @broadcast_address) unless @broadcast_address.empty?
-        #msg.add_attribute(:mtu, @mtu)
-        #msg.add_attribute(:operstate, operstate_to_int(@operational_state))
-        #msg.add_attribute(:linkmode, @mode)
-        #msg.add_attribute(:qdisc, @qdisc)
-        #msg.add_attribute(:promiscuity, @promiscuity)
+        # msg.add_attribute(:mtu, @mtu)
+        # msg.add_attribute(:operstate, operstate_to_int(@operational_state))
+        # msg.add_attribute(:linkmode, @mode)
+        # msg.add_attribute(:qdisc, @qdisc)
+        # msg.add_attribute(:promiscuity, @promiscuity)
 
         msg.add_attribute(:group, @group) unless @group == -1
         msg.add_attribute(:txqlen, @tx_queue_length) unless @tx_queue_length == -1
@@ -135,7 +135,6 @@ module Netlink
         @hwtype = :NETROM
         li = Nl::Attr::LinkInfo.new
         li.add_attribute(:kind, kind)
-        p li
         msg.attributes[:linkinfo] = li
       end
     end

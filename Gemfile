@@ -6,9 +6,9 @@ source 'https://rubygems.org'
 gemspec
 
 group :development do
-  gem 'debase', '~>0.2'
-  gem 'ruby-debug-ide', '~> 0.7'
-  gem 'solargraph', '~>0.22', require: false
+  gem 'debug'
+  gem 'ruby-lsp', require: false
+  gem 'ruby-lsp-rspec', require: false
   gem 'yard', '~>0.9', require: false
 end
 

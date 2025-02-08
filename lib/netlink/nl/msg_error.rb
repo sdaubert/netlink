@@ -3,32 +3,27 @@
 module Netlink
   module Nl
     # Netlink message error
-    class MsgError < Msg
-      define_fields error: 'i'
+    class MsgError < MsgBase
+      define_attr :error, CInt
+      define_attr :body, BinStruct::String
 
-      # @param [Integer] error
-      # @param [Hash] orig_header
-      def initialize(error: 0, orig_header: {})
-        super(header: orig_header, fields: { error: error })
-      end
+      alias orig_header body
 
       # Say if the current message is an ACK one
       # @return [Boolean]
       def ack?
-        fields.error.zero?
+        error.zero?
       end
 
       def string_error
-        return 'ACK' if fields.error.zero?
+        return 'ACK' if ack?
 
-        errno = SystemCallError.new('', fields.error.abs)
+        errno = SystemCallError.new('', error.abs)
         "#{errno.class.to_s.delete_prefix('Errno::')},#{errno.message.delete_suffix(' - ')}"
       end
-
-      def inspect
-        "#<#{self.class} error=(#{fields.error},#{string_error}), @header=#{header.inspect}, @attributes=#{attributes.inspect}, @data=#{data.inspect}>"
-      end
     end
-    Msg.register_type(Constants::NLMSG_ERROR, MsgError)
+    PacketGen::Header.add_class(MsgError)
+    Msg.bind(MsgError, type: Constants::NLMSG_ERROR)
+    MsgError.bind(Msg)
   end
 end
