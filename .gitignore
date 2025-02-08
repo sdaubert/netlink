@@ -7,6 +7,9 @@
 /spec/reports/
 /tmp/
 /vendor/
+/.vscode/
+
+Gemfile.lock
 
 # rspec failure tracking
 .rspec_status
