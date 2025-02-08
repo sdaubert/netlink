@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'packetgen'
+
 require_relative 'netlink/version'
 require_relative 'netlink/constants'
 

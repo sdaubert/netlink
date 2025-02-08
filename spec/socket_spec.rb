@@ -70,16 +70,16 @@ module Netlink
             sock_snd.bind(0)
             sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
             msg, = sock_recv.recvmsg
-            expect(msg.data).to eq(data)
+            expect(msg.body).to eq(data)
           end
         end
       end
 
       it 'accepts a Nl::Msg as first parameter' do
         Socket.new(NETLINK_GENERIC) do |sock_snd|
-          msg = Nl::Msg.new(data: 'test', header: {type: NETLINK_GENERIC})
+          msg = Nl::Msg.new(body: 'test', type: NETLINK_GENERIC)
           sock_snd.bind(0)
-          expect { sock_snd.sendmsg('test') }.to_not raise_error
+          expect { sock_snd.sendmsg(msg) }.to_not raise_error
         end
       end
 
@@ -100,8 +100,8 @@ module Netlink
             sock_snd.bind(0)
             sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
             msg, = sock_recv.recvmsg
-            expect(msg).to be_a(Nl::Msg)
-            expect(msg.data).to eq(data)
+            expect(msg.is?('Nl::Msg')).to be(true)
+            expect(msg.body).to eq(data)
           end
         end
       end
@@ -130,9 +130,9 @@ module Netlink
             sock_snd.bind(0)
             sock_snd.sendmsg(data, 1, 0, 0, Addrinfo.new(sock_recv.addr))
             msg, = sock_recv.recvmsg
-            expect(msg).to be_a(Nl::Msg)
-            expect(msg.header.type).to eq(1)
-            expect(msg.header.pid).to eq(sock_snd.addr[1])
+            expect(msg.is?('Nl::Msg')).to be(true)
+            expect(msg.nl_msg.type).to eq(1)
+            expect(msg.nl_msg.pid).to eq(sock_snd.addr[1])
           end
         end
       end
@@ -141,16 +141,21 @@ module Netlink
         Socket.new(NETLINK_GENERIC) do |sock|
           sock.bind(0)
           sock.sendmsg('test', 1, NLM_F_ACK, 0, Addrinfo.new(['AF_NETLINK', 0, 0]))
-          ack, = sock.recvmsg
+          pkt, = sock.recvmsg
+
+          msg = pkt.nl_msg
+          expect(msg.type).to eq(Constants::NLMSG_ERROR)
+          ack = msg.body
           expect(ack).to be_a(Nl::MsgError)
-          expect(ack.fields.error).to eq(0)
+          expect(ack).to be_ack
+          expect(ack.error).to eq(0)
         end
       end
 
       it 'raises when receiving a Nl::MsgError' do
         Socket.new(NETLINK_ROUTE) do |sock|
           sock.bind(0)
-          sock.sendmsg(Nl::Msg.new(header: { type: 10_000, flags: %i[request ack] }))
+          sock.sendmsg(Nl::Msg.new(type: 10_000, flags: %i[request ack]))
           expect { sock.recvmsg }.to raise_error(NlmError).with_message(/operation not supported/i)
         end
       end

@@ -135,7 +135,6 @@ module Netlink
         @hwtype = :NETROM
         li = Nl::Attr::LinkInfo.new
         li.add_attribute(:kind, kind)
-        p li
         msg.attributes[:linkinfo] = li
       end
     end

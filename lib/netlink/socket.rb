@@ -92,19 +92,19 @@ module Netlink
     # @return [Integer] number of bytes sent
     def sendmsg(mesg, nlm_type=0, nlm_flags=0, flags=0, dest_sockaddr=nil)
       nlmsg = create_or_update_nlmsg(mesg, nlm_type, nlm_flags)
-      @socket.sendmsg(nlmsg.encode, flags, dest_sockaddr&.to_s)
+      @socket.sendmsg(nlmsg.to_s, flags, dest_sockaddr&.to_s)
     end
 
     # Receive a message
     # @param [Integer] maxmesglen maximum number of bytes to receive as message
     # @param [Integer] flags +flags+ should be a bitwise OR of {::Socket}::MSG_* constants
-    # @return [Array(Nl::Msg, Addrinfo)]
+    # @return [Array(PacketGen::Packet Addrinfo)]
     # @raise [NlmsgError]
     def recvmsg(maxmesglen=nil, flags=0)
       maxmesglen ||= @default_buffer_size
       mesg, sender_ai, = @socket.recvmsg(maxmesglen, flags)
       sender_ai = Addrinfo.new(sender_ai.to_s)
-      nlmsg = Nl::Msg.decode(mesg)
+      nlmsg = PacketGen.parse(mesg, first_header: 'Nl::Msg')
       raise_on_error(nlmsg)
 
       [nlmsg, sender_ai]
@@ -142,10 +142,10 @@ module Netlink
     def create_or_update_nlmsg(mesg, type=nil, flags=0)
       case mesg
       when String
-        Nl::Msg.new(data: mesg, header: { type: type, flags: flags, seq: seqnum, pid: @pid })
+        Nl::Msg.new(body: mesg, type:, flags:, seq: seqnum, pid: @pid)
       when Nl::Msg
-        mesg.header.seq = seqnum
-        mesg.header.pid = @pid
+        mesg.seq = seqnum
+        mesg.pid = @pid
         mesg
       else
         raise TypeError, "mesg should be a #{Nl::Msg} or a String"
@@ -161,10 +161,10 @@ module Netlink
     end
 
     def raise_on_error(msg)
-      return unless msg.is_a?(Nl::MsgError)
-      return if msg.ack?
+      return unless msg.is?('Nl::MsgError')
+      return if msg.nl_msgerror.ack?
 
-      raise NlmError, msg.string_error
+      raise NlmError, msg.nl_msgerror.string_error
     end
   end
 end
